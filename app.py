@@ -334,8 +334,15 @@ if uploaded is None:
     st.stop()
 
 # Чтение изображения
+# Чтение изображения (безопасно для JPG / PNG / RGBA / Grayscale)
 pil_img = Image.open(uploaded).convert("RGB")
-img_rgb = np.array(pil_img)
+img_rgb = np.array(pil_img, dtype=np.uint8)
+if img_rgb.ndim == 2:
+    img_rgb = cv2.cvtColor(img_rgb, cv2.COLOR_GRAY2RGB)
+if img_rgb.shape[2] != 3:
+    img_rgb = img_rgb[:, :, :3]
+img_rgb = np.ascontiguousarray(img_rgb)
+
 gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
 # Извлечение геометрии
@@ -396,14 +403,60 @@ with col_right:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title">🖼️ Изображение и результат</div>', unsafe_allow_html=True)
 
-    if show_contours:
-        edges_vis = (geometry * 255).astype(np.uint8)
-        edges_rgb = cv2.cvtColor(edges_vis, cv2.COLOR_GRAY2RGB)
-        overlay = cv2.addWeighted(img_rgb, 0.55, edges_rgb, 0.85, 0)
-        preview = overlay
-    else:
-        preview = img_rgb
+        # --- Безопасное наложение контуров ---
+    preview = img_rgb  # по умолчанию — исходное изображение
 
+    if show_contours:
+        try:
+            # 1) Гарантируем, что img_rgb — uint8, 3 канала (RGB)
+            img_safe = img_rgb
+            if img_safe.dtype != np.uint8:
+                img_safe = np.clip(img_safe, 0, 255).astype(np.uint8)
+            if img_safe.ndim == 2:
+                img_safe = cv2.cvtColor(img_safe, cv2.COLOR_GRAY2RGB)
+            elif img_safe.shape[2] == 4:
+                img_safe = cv2.cvtColor(img_safe, cv2.COLOR_RGBA2RGB)
+            elif img_safe.shape[2] > 3:
+                img_safe = img_safe[:, :, :3]
+            if not img_safe.flags["C_CONTIGUOUS"]:
+                img_safe = np.ascontiguousarray(img_safe)
+
+            # 2) Маска контуров (uint8, 1 канал)
+            edges_vis = (np.clip(geometry, 0.0, 1.0) * 255).astype(np.uint8)
+            if edges_vis.ndim == 3:
+                edges_vis = cv2.cvtColor(edges_vis, cv2.COLOR_RGB2GRAY)
+
+            # 3) Приводим edges_rgb к тому же размеру (W, H), что и img_safe
+            #    cv2.resize ожидает dsize = (width, height)
+            target_h, target_w = img_safe.shape[:2]
+            if edges_vis.shape[:2] != (target_h, target_w):
+                edges_vis = cv2.resize(
+                    edges_vis, dsize=(target_w, target_h),
+                    interpolation=cv2.INTER_NEAREST,
+                )
+
+            # 4) Делаем 3-канальным RGB
+            edges_rgb = cv2.cvtColor(edges_vis, cv2.COLOR_GRAY2RGB)
+
+            # 5) Финальные страховки: тип, форма, непрерывность
+            edges_rgb = np.ascontiguousarray(edges_rgb.astype(np.uint8))
+            img_safe = np.ascontiguousarray(img_safe.astype(np.uint8))
+
+            assert img_safe.shape == edges_rgb.shape, (
+                f"Форма не совпадает: {img_safe.shape} vs {edges_rgb.shape}"
+            )
+            assert img_safe.dtype == edges_rgb.dtype == np.uint8
+
+            # 6) Наложение
+            overlay = cv2.addWeighted(img_safe, 0.55, edges_rgb, 0.45, 0)
+            preview = overlay
+
+        except Exception as e:
+            st.warning(
+                f"⚠️ Не удалось наложить контуры ({e}). "
+                f"Показано исходное изображение."
+            )
+            preview = img_rgb
     st.image(preview, use_container_width=True,
              caption="Контуры геометрии, использованные для сонификации"
              if show_contours else "Исходное изображение")
