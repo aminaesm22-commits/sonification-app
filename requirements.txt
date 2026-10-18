@@ -1,6 +1,7 @@
-streamlit
+streamlit>=1.30
 numpy
-pillow
 scipy
 matplotlib
+Pillow
 opencv-python-headless
+requests
