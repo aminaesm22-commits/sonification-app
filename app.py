@@ -610,43 +610,59 @@ st.markdown('</div>', unsafe_allow_html=True)
 # ============================================================
 # АВТОМАТИЧЕСКИЙ ПОИСК ПОХОЖИХ ТРЕКОВ (пункт 1)
 # ============================================================
-st.markdown('<div class="card">', unsafe_allow_html=True)
-st.markdown('<div class="card-title">🎧 Похожие реальные композиции</div>', unsafe_allow_html=True)
+@st.cache_data(ttl=3500, show_spinner=False)
+def find_similar_tracks(avg_freq: float, rms: float, duration: float,
+                        token: str, limit: int = 5) -> list[dict]:
+    """
+    Ищет похожие реальные треки через Spotify Search API
+    (замена заблокированного эндпоинта /v1/recommendations).
+    Средняя частота и RMS преобразуются в ключевые слова настроения.
+    """
+    if not token:
+        return []
 
-token = get_spotify_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
-
-if not token:
-    st.info(
-        "🔑 Для поиска похожих треков добавьте `SPOTIFY_CLIENT_ID` и `SPOTIFY_CLIENT_SECRET` "
-        "в начале файла `app.py` или в `.streamlit/secrets.toml`. "
-        "Ключи бесплатно выдаются на [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)."
-    )
-else:
-    with st.spinner("Ищу композиции с похожими характеристиками…"):
-        similar = find_similar_tracks(
-            avg_freq=stats["avg_freq"],
-            rms=stats["rms"],
-            duration=stats["duration"],
-            token=token,
-            limit=5,
-        )
-    if not similar:
-        st.warning("Не удалось получить рекомендации. Возможно, временно недоступен API Spotify.")
+    # 1) Средняя частота -> настроение / стиль
+    if avg_freq < 500:
+        mood = "ambient dark"
+    elif avg_freq < 1500:
+        mood = "chill electronic"
+    elif avg_freq < 2500:
+        mood = "mellow indie"
     else:
-        st.caption(
-            f"Подобрано по: средняя частота ≈ {stats['avg_freq']:.0f} Гц "
-            f"(→ темп), RMS ≈ {stats['rms']:.2f} (→ энергия)"
+        mood = "bright energetic"
+
+    # 2) RMS -> дополнительный модификатор
+    if rms < 0.1:
+        mood += " soft"
+    elif rms > 0.5:
+        mood += " upbeat"
+
+    query = mood.strip()
+
+    try:
+        resp = requests.get(
+            "https://api.spotify.com/v1/search",
+            headers={"Authorization": f"Bearer {token}"},
+            params={
+                "q": query,
+                "type": "track",
+                "limit": limit,
+            },
+            timeout=10,
         )
-        for tr in similar:
-            link = f' — <a href="{tr["url"]}" target="_blank">открыть</a>' if tr["url"] else ""
-            st.markdown(
-                f'<div class="track-item">'
-                f'<span class="track-name">{tr["name"]}</span>'
-                f'<span class="track-artist"> — {tr["artist"]}</span>{link}'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-st.markdown('</div>', unsafe_allow_html=True)
+        if resp.status_code != 200:
+            return []
+        items = resp.json().get("tracks", {}).get("items", [])
+        return [
+            {
+                "name": t.get("name", "Unknown"),
+                "artist": t["artists"][0]["name"] if t.get("artists") else "—",
+                "url": t.get("external_urls", {}).get("spotify", ""),
+            }
+            for t in items
+        ]
+    except Exception:
+        return []
 
 # ============================================================
 # ФУТЕР
