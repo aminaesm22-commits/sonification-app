@@ -19,14 +19,12 @@ st.set_page_config(
 )
 
 # ============================================================
-# 🔑 ВСТАВЬТЕ СВОИ КЛЮЧИ SPOTIFY ЗДЕСЬ (или через st.secrets)
+# 🔑 ВСТАВЬТЕ СВОИ КЛЮЧИ SPOTIFY ЗДЕСЬ
 # ============================================================
-# Вариант 1: напрямую (для локального запуска)
 SPOTIFY_CLIENT_ID = ""       # <-- ваш Client ID
 SPOTIFY_CLIENT_SECRET = ""   # <-- ваш Client Secret
 
-# Вариант 2: через .streamlit/secrets.toml (рекомендуется для деплоя)
-# В файле secrets.toml:
+# Либо через .streamlit/secrets.toml:
 #   SPOTIFY_CLIENT_ID = "xxx"
 #   SPOTIFY_CLIENT_SECRET = "yyy"
 try:
@@ -38,7 +36,7 @@ except Exception:
     pass
 
 # ============================================================
-# ЦВЕТОВЫЕ ТЕМЫ (пункт 4)
+# ЦВЕТОВЫЕ ТЕМЫ (включая сайдбар)
 # ============================================================
 THEMES = {
     "Пастель (по умолчанию)": {
@@ -50,6 +48,9 @@ THEMES = {
         "wave_color": "#9b87c9",
         "wave_fill": "#c8b6e2",
         "text_muted": "#8a8aa0",
+        "sidebar_bg": "linear-gradient(180deg, #fbf6ff 0%, #f0f6fb 100%)",
+        "sidebar_border": "rgba(200, 190, 220, 0.3)",
+        "sidebar_text": "#5a5a78",
     },
     "Тёплый закат": {
         "bg_gradient": "linear-gradient(135deg, #fff5ec 0%, #ffe8d6 50%, #ffd6c9 100%)",
@@ -60,6 +61,9 @@ THEMES = {
         "wave_color": "#d88a6a",
         "wave_fill": "#f0c8b0",
         "text_muted": "#a08070",
+        "sidebar_bg": "linear-gradient(180deg, #fff8f0 0%, #ffeede 100%)",
+        "sidebar_border": "rgba(240, 200, 170, 0.45)",
+        "sidebar_text": "#7a4a3a",
     },
     "Прохладный бриз": {
         "bg_gradient": "linear-gradient(135deg, #f0f8ff 0%, #e6f2fa 50%, #dceefa 100%)",
@@ -70,6 +74,9 @@ THEMES = {
         "wave_color": "#6a9ab8",
         "wave_fill": "#a8c8e0",
         "text_muted": "#7090a8",
+        "sidebar_bg": "linear-gradient(180deg, #f2faff 0%, #e2f0fa 100%)",
+        "sidebar_border": "rgba(168, 208, 232, 0.45)",
+        "sidebar_text": "#3a5a7a",
     },
     "Мятная свежесть": {
         "bg_gradient": "linear-gradient(135deg, #f0fff4 0%, #e6faf0 50%, #dcf5ea 100%)",
@@ -80,10 +87,12 @@ THEMES = {
         "wave_color": "#6ab898",
         "wave_fill": "#a8d8c0",
         "text_muted": "#709088",
+        "sidebar_bg": "linear-gradient(180deg, #f2fff8 0%, #e2f8ee 100%)",
+        "sidebar_border": "rgba(168, 232, 200, 0.45)",
+        "sidebar_text": "#3a6a5a",
     },
 }
 
-# Выбор темы в сайдбаре (пункт 4)
 with st.sidebar:
     st.markdown("## 🎨 Оформление")
     theme_name = st.selectbox("Цветовая тема", list(THEMES.keys()), index=0)
@@ -91,7 +100,7 @@ with st.sidebar:
     st.markdown('<div class="divider-soft"></div>', unsafe_allow_html=True)
 
 # ============================================================
-# КАСТОМНЫЙ CSS (динамический, на основе выбранной темы)
+# ДИНАМИЧЕСКИЙ CSS
 # ============================================================
 CUSTOM_CSS = f"""
 <style>
@@ -141,13 +150,25 @@ html, body, [class*="css"] {{
     letter-spacing: 0.3px;
 }}
 
+/* ======== САЙДБАР — темизирован ======== */
 section[data-testid="stSidebar"] {{
-    background: linear-gradient(180deg, #fbf6ff 0%, #f0f6fb 100%);
-    border-right: 1px solid rgba(200, 190, 220, 0.3);
+    background: {T['sidebar_bg']} !important;
+    border-right: 1px solid {T['sidebar_border']} !important;
 }}
-section[data-testid="stSidebar"] .stMarkdown h2 {{
+section[data-testid="stSidebar"] * {{
+    color: {T['sidebar_text']} !important;
+}}
+section[data-testid="stSidebar"] .stMarkdown h2,
+section[data-testid="stSidebar"] .stMarkdown h3 {{
     font-family: 'Cormorant Garamond', serif;
-    color: {T['title_color']};
+    color: {T['sidebar_text']} !important;
+}}
+section[data-testid="stSidebar"] div[data-baseweb="select"] > div,
+section[data-testid="stSidebar"] input {{
+    border-color: {T['sidebar_border']} !important;
+}}
+section[data-testid="stSidebar"] [role="slider"] {{
+    background: {T['accent']} !important;
 }}
 
 .stButton > button, .stDownloadButton > button {{
@@ -173,7 +194,6 @@ audio {{
     margin-top: 0.5rem;
 }}
 
-/* Характеристики в столбик (пункт 2) */
 .stat-row {{
     display: flex;
     justify-content: space-between;
@@ -212,6 +232,15 @@ audio {{
 }}
 .track-name {{ font-weight: 600; color: {T['title_color']}; }}
 .track-artist {{ color: {T['text_muted']}; font-size: 0.85rem; }}
+
+.img-caption {{
+    text-align: center;
+    font-size: 0.85rem;
+    color: {T['text_muted']};
+    margin-top: 0.35rem;
+    margin-bottom: 0.8rem;
+    letter-spacing: 0.2px;
+}}
 </style>
 """
 st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
@@ -349,7 +378,6 @@ def to_wav_bytes(audio: np.ndarray, sr: int) -> io.BytesIO:
 
 
 def describe_audio(audio: np.ndarray, sr: int) -> dict:
-    """Характеристики волны (пункт 2) — средняя частота, амплитуда, длительность."""
     if audio.size == 0:
         return {"avg_freq": 0, "peak_amp": 0, "rms": 0, "duration": 0, "richness": 0}
     n = min(len(audio), sr * 4)
@@ -370,11 +398,10 @@ def describe_audio(audio: np.ndarray, sr: int) -> dict:
 
 
 # ============================================================
-# ПОИСК ПОХОЖИХ ТРЕКОВ ЧЕРЕЗ SPOTIFY (пункт 1)
+# SPOTIFY: ТОКЕН + ПОИСК ЧЕРЕЗ SEARCH API
 # ============================================================
 @st.cache_data(ttl=3500, show_spinner=False)
-def get_spotify_token(client_id: str, client_secret: str) -> str | None:
-    """Client Credentials Flow — без логина пользователя [citation:14]."""
+def get_spotify_token(client_id: str, client_secret: str):
     if not client_id or not client_secret:
         return None
     try:
@@ -394,45 +421,47 @@ def get_spotify_token(client_id: str, client_secret: str) -> str | None:
 
 @st.cache_data(ttl=3500, show_spinner=False)
 def find_similar_tracks(avg_freq: float, rms: float, duration: float,
-                        token: str, limit: int = 5) -> list[dict]:
+                        token: str, limit: int = 5) -> list:
     """
-    Ищет реальные треки через Spotify Recommendations API.
-    Маппинг характеристик нашей волны на target-параметры Spotify:
-      - avg_freq (Гц) -> target_tempo (BPM), нормализованный диапазон
-      - rms (0..1)    -> target_energy
+    Поиск похожих реальных треков через Spotify Search API.
+    Средняя частота и RMS -> ключевые слова настроения.
     """
     if not token:
         return []
 
-    # Маппинг: средняя частота 150..4000 Гц -> темп 60..180 BPM
-    norm_freq = np.clip((avg_freq - 150) / (4000 - 150), 0, 1)
-    target_tempo = 60 + norm_freq * 120
-    target_energy = float(np.clip(rms, 0.1, 0.95))
+    if avg_freq < 500:
+        mood = "ambient dark"
+    elif avg_freq < 1500:
+        mood = "chill electronic"
+    elif avg_freq < 2500:
+        mood = "mellow indie"
+    else:
+        mood = "bright energetic"
+
+    if rms < 0.1:
+        mood += " soft"
+    elif rms > 0.5:
+        mood += " upbeat"
+
+    query = mood.strip()
 
     try:
         resp = requests.get(
-            "https://api.spotify.com/v1/recommendations",
+            "https://api.spotify.com/v1/search",
             headers={"Authorization": f"Bearer {token}"},
-            params={
-                "seed_genres": "ambient",
-                "limit": limit,
-                "target_tempo": round(target_tempo, 1),
-                "target_energy": round(target_energy, 2),
-                "min_tempo": max(40, target_tempo - 40),
-                "max_tempo": min(220, target_tempo + 40),
-            },
+            params={"q": query, "type": "track", "limit": limit},
             timeout=10,
         )
         if resp.status_code != 200:
             return []
-        tracks = resp.json().get("tracks", [])
+        items = resp.json().get("tracks", {}).get("items", [])
         return [
             {
-                "name": t["name"],
+                "name": t.get("name", "Unknown"),
                 "artist": t["artists"][0]["name"] if t.get("artists") else "—",
                 "url": t.get("external_urls", {}).get("spotify", ""),
             }
-            for t in tracks
+            for t in items
         ]
     except Exception:
         return []
@@ -467,7 +496,7 @@ if img_rgb.shape[2] != 3:
 img_rgb = np.ascontiguousarray(img_rgb)
 gray = cv2.cvtColor(img_rgb, cv2.COLOR_RGB2GRAY)
 
-# Извлечение геометрии и синтез
+# Синтез
 geometry = extract_geometry(gray, scan_size, canny_low, canny_high)
 audio = image_to_sound(geometry, sample_rate, pixel_duration_ms,
                        freq_min, freq_max, waveform)
@@ -479,7 +508,7 @@ stats = describe_audio(audio, sample_rate)
 # ============================================================
 col_left, col_right = st.columns(2, gap="large")
 
-# ----- ЛЕВАЯ: Симметричная осциллограмма (пункт 3) + характеристики в столбик (пункт 2) -----
+# ----- ЛЕВАЯ: симметричная волна + характеристики в столбик -----
 with col_left:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title">🌊 Волновая форма</div>', unsafe_allow_html=True)
@@ -492,14 +521,12 @@ with col_left:
     t_axis = np.arange(vis_len) / sample_rate
     wave_vis = audio[:vis_len]
 
-    # ✅ СИММЕТРИЯ: используем abs() для верхней и нижней огибающей (пункт 3)
-    # Строим зеркальный график: +|wave| и -|wave| — амплитуда одинакова сверху и снизу
+    # Симметричная огибающая: +|wave| и -|wave|
     pos_env = np.abs(wave_vis)
     ax.fill_between(t_axis, pos_env, -pos_env,
                     color=T['wave_fill'], alpha=0.45, linewidth=0)
     ax.plot(t_axis, pos_env, color=T['wave_color'], linewidth=0.9)
     ax.plot(t_axis, -pos_env, color=T['wave_color'], linewidth=0.9)
-    # Центральная ось
     ax.axhline(0, color=T['wave_color'], linewidth=0.8, alpha=0.6, linestyle="--")
 
     ax.set_xlabel("Время, с", color=T['text_muted'], fontsize=9)
@@ -508,13 +535,12 @@ with col_left:
     for spine in ax.spines.values():
         spine.set_color("#d8d2e6")
     ax.grid(True, color="#ece7f5", linewidth=0.6)
-    # Фиксируем симметричный диапазон
     max_env = float(np.max(pos_env)) if len(pos_env) else 1.0
     ax.set_ylim(-max_env * 1.1, max_env * 1.1)
     st.pyplot(fig, use_container_width=True)
     plt.close(fig)
 
-    # ✅ Характеристики строго в столбик (пункт 2)
+    # Характеристики в столбик
     st.markdown(
         f"""
         <div class="stat-row"><span class="stat-label">Средняя частота</span><span class="stat-value">{stats['avg_freq']:.1f} Гц</span></div>
@@ -527,31 +553,45 @@ with col_left:
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ----- ПРАВАЯ: Изображение + скачивание + плеер -----
+# ----- ПРАВАЯ: ДВЕ картинки (исходная + контуры) + WAV + плеер -----
 with col_right:
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="card-title">🖼️ Изображение и результат</div>', unsafe_allow_html=True)
 
-    preview = img_rgb
+    # Готовим изображение с наложенными контурами
+    contour_img = img_rgb.copy()
+    try:
+        img_safe = np.ascontiguousarray(img_rgb.astype(np.uint8))
+        edges_vis = (np.clip(geometry, 0.0, 1.0) * 255).astype(np.uint8)
+        if edges_vis.ndim == 3:
+            edges_vis = cv2.cvtColor(edges_vis, cv2.COLOR_RGB2GRAY)
+        th, tw = img_safe.shape[:2]
+        if edges_vis.shape[:2] != (th, tw):
+            edges_vis = cv2.resize(edges_vis, dsize=(tw, th),
+                                   interpolation=cv2.INTER_NEAREST)
+        edges_rgb = np.ascontiguousarray(cv2.cvtColor(edges_vis, cv2.COLOR_GRAY2RGB))
+        contour_img = cv2.addWeighted(img_safe, 0.55, edges_rgb, 0.45, 0)
+    except Exception as e:
+        st.warning(f"⚠️ Не удалось наложить контуры ({e}). Показано исходное изображение.")
+        contour_img = img_rgb
+
+    # Две картинки рядом
     if show_contours:
-        try:
-            img_safe = np.ascontiguousarray(img_rgb.astype(np.uint8))
-            edges_vis = (np.clip(geometry, 0.0, 1.0) * 255).astype(np.uint8)
-            if edges_vis.ndim == 3:
-                edges_vis = cv2.cvtColor(edges_vis, cv2.COLOR_RGB2GRAY)
-            th, tw = img_safe.shape[:2]
-            if edges_vis.shape[:2] != (th, tw):
-                edges_vis = cv2.resize(edges_vis, dsize=(tw, th),
-                                       interpolation=cv2.INTER_NEAREST)
-            edges_rgb = np.ascontiguousarray(cv2.cvtColor(edges_vis, cv2.COLOR_GRAY2RGB))
-            preview = cv2.addWeighted(img_safe, 0.55, edges_rgb, 0.45, 0)
-        except Exception as e:
-            st.warning(f"⚠️ Не удалось наложить контуры ({e}). Показано исходное изображение.")
-            preview = img_rgb
+        img_col1, img_col2 = st.columns(2, gap="small")
+        with img_col1:
+            st.image(img_rgb, use_container_width=True)
+            st.markdown('<div class="img-caption">📷 Исходное изображение</div>',
+                        unsafe_allow_html=True)
+        with img_col2:
+            st.image(contour_img, use_container_width=True)
+            st.markdown('<div class="img-caption">✏️ Считанные линии (контуры)</div>',
+                        unsafe_allow_html=True)
+    else:
+        st.image(img_rgb, use_container_width=True)
+        st.markdown('<div class="img-caption">📷 Исходное изображение</div>',
+                    unsafe_allow_html=True)
 
-    st.image(preview, use_container_width=True,
-             caption="Контуры геометрии" if show_contours else "Исходное изображение")
-
+    # Аудио и скачивание
     wav_buf = to_wav_bytes(audio, sample_rate)
     wav_bytes = wav_buf.getvalue()
     st.audio(wav_bytes, format="audio/wav")
@@ -565,7 +605,7 @@ with col_right:
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
-# НИЖНИЙ БЛОК: профиль плотности линий
+# НИЖНИЙ БЛОК: профиль плотности
 # ============================================================
 st.markdown('<div class="card">', unsafe_allow_html=True)
 st.markdown('<div class="card-title">📊 Профиль плотности геометрических линий</div>',
@@ -608,61 +648,45 @@ plt.close(fig2)
 st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
-# АВТОМАТИЧЕСКИЙ ПОИСК ПОХОЖИХ ТРЕКОВ (пункт 1)
+# ПОХОЖИЕ ТРЕКИ
 # ============================================================
-@st.cache_data(ttl=3500, show_spinner=False)
-def find_similar_tracks(avg_freq: float, rms: float, duration: float,
-                        token: str, limit: int = 5) -> list[dict]:
-    """
-    Ищет похожие реальные треки через Spotify Search API
-    (замена заблокированного эндпоинта /v1/recommendations).
-    Средняя частота и RMS преобразуются в ключевые слова настроения.
-    """
-    if not token:
-        return []
+st.markdown('<div class="card">', unsafe_allow_html=True)
+st.markdown('<div class="card-title">🎧 Похожие реальные композиции</div>', unsafe_allow_html=True)
 
-    # 1) Средняя частота -> настроение / стиль
-    if avg_freq < 500:
-        mood = "ambient dark"
-    elif avg_freq < 1500:
-        mood = "chill electronic"
-    elif avg_freq < 2500:
-        mood = "mellow indie"
-    else:
-        mood = "bright energetic"
+token = get_spotify_token(SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET)
 
-    # 2) RMS -> дополнительный модификатор
-    if rms < 0.1:
-        mood += " soft"
-    elif rms > 0.5:
-        mood += " upbeat"
-
-    query = mood.strip()
-
-    try:
-        resp = requests.get(
-            "https://api.spotify.com/v1/search",
-            headers={"Authorization": f"Bearer {token}"},
-            params={
-                "q": query,
-                "type": "track",
-                "limit": limit,
-            },
-            timeout=10,
+if not token:
+    st.info(
+        "🔑 Для поиска похожих треков добавьте `SPOTIFY_CLIENT_ID` и `SPOTIFY_CLIENT_SECRET` "
+        "в начале файла `app.py` или в `.streamlit/secrets.toml`. "
+        "Ключи бесплатно выдаются на [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard)."
+    )
+else:
+    with st.spinner("Ищу композиции с похожими характеристиками…"):
+        similar = find_similar_tracks(
+            avg_freq=stats["avg_freq"],
+            rms=stats["rms"],
+            duration=stats["duration"],
+            token=token,
+            limit=5,
         )
-        if resp.status_code != 200:
-            return []
-        items = resp.json().get("tracks", {}).get("items", [])
-        return [
-            {
-                "name": t.get("name", "Unknown"),
-                "artist": t["artists"][0]["name"] if t.get("artists") else "—",
-                "url": t.get("external_urls", {}).get("spotify", ""),
-            }
-            for t in items
-        ]
-    except Exception:
-        return []
+    if not similar:
+        st.warning("Не удалось получить рекомендации. Возможно, временно недоступен API Spotify.")
+    else:
+        st.caption(
+            f"Подобрано по: средняя частота ≈ {stats['avg_freq']:.0f} Гц, "
+            f"RMS ≈ {stats['rms']:.2f}"
+        )
+        for tr in similar:
+            link = f' — <a href="{tr["url"]}" target="_blank">открыть</a>' if tr["url"] else ""
+            st.markdown(
+                f'<div class="track-item">'
+                f'<span class="track-name">{tr["name"]}</span>'
+                f'<span class="track-artist"> — {tr["artist"]}</span>{link}'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+st.markdown('</div>', unsafe_allow_html=True)
 
 # ============================================================
 # ФУТЕР
